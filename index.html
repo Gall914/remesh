@@ -402,6 +402,13 @@ input::placeholder{color:var(--dim)}
 /* Кнопка видеозвонка в хедере */
 .call-hdr-btn.video{font-size:16px}
 
+/* ── DATE SEPARATOR ── */
+.date-sep{display:flex;align-items:center;gap:8px;padding:12px 16px 6px;
+  pointer-events:none;user-select:none}
+.date-sep::before,.date-sep::after{content:'';flex:1;height:1px;background:var(--bdr)}
+.date-sep span{font-size:11px;color:var(--dim);letter-spacing:1px;
+  white-space:nowrap;font-family:'VT323',monospace;font-size:13px}
+
 /* ── READ RECEIPTS ── */
 .meta{font-size:10px;color:var(--dim);padding:0 3px;display:flex;align-items:center;gap:4px}
 .ticks{font-size:12px;line-height:1;color:var(--dim);letter-spacing:-2px}
@@ -1220,6 +1227,18 @@ const chid= (a,b) => [a,b].sort().join('~~');
 const fmtT= ts => { const d=new Date(ts); return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0') };
 const fmtD= s  => { const m=Math.floor(s/60),x=Math.round(s%60); return m+':'+(x<10?'0':'')+x };
 const esc = s  => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const MONTHS=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+function fmtDate(ts){
+  const d=new Date(ts), now=new Date();
+  const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const yesterday=new Date(today-86400000);
+  const msgDay=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  if(+msgDay===+today) return 'СЕГОДНЯ';
+  if(+msgDay===+yesterday) return 'ВЧЕРА';
+  const day=d.getDate(), mon=MONTHS[d.getMonth()];
+  if(d.getFullYear()===now.getFullYear()) return day+' '+mon.toUpperCase();
+  return day+' '+mon.toUpperCase()+' '+d.getFullYear();
+}
 const fmtSz= b => b<1024?b+' Б':b<1048576?(b/1024).toFixed(1)+' КБ':(b/1048576).toFixed(1)+' МБ';
 
 function toast(msg,dur=3000){
@@ -1673,7 +1692,7 @@ function openChat(peer){
   $('c-online').classList.remove('show');
   $('c-online-dot').classList.remove('show');
   loadAvatar(peer, b64=>{ if(b64) $('c-av').innerHTML=`<img src="${b64}" alt="av"><div class="online-dot" id="c-online-dot"></div>`; });
-  const ml=$('msglist'); ml.innerHTML='';
+  const ml=$('msglist'); ml.innerHTML=''; ml.dataset.lastDate='';
   (msgCache[CUR_CH]||[]).forEach(m=>appendMsg(m,false));
   scrollToBottom(ml);
   loadReactionsForChat(CUR_CH);
@@ -1686,6 +1705,21 @@ function openChat(peer){
 function appendMsg(msg,scroll=true){
   const isMe=msg.from===ME_NICK;
   const isGroup=!!CUR_GRP;
+  const ml=$('msglist');
+
+  // ── Разделитель дат ──
+  if(msg.ts){
+    const d=new Date(msg.ts);
+    const dateKey=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+    const lastKey=ml.dataset.lastDate||'';
+    if(dateKey!==lastKey){
+      ml.dataset.lastDate=dateKey;
+      const sep=document.createElement('div');
+      sep.className='date-sep';
+      sep.innerHTML='<span>'+fmtDate(msg.ts)+'</span>';
+      ml.appendChild(sep);
+    }
+  }
   const g=document.createElement('div');
   g.className='mg '+(isMe?'me':'them');
   g.dataset.id=msg.id;
@@ -2482,7 +2516,7 @@ function openGroupChat(gid){
   $('c-online-dot').classList.remove('show');
   if(g.avatar){ $('c-av').innerHTML=`<img src="${g.avatar}" alt="g">`; }
   else { $('c-av').innerHTML=grpIni(g.name); }
-  const ml=$('msglist'); ml.innerHTML='';
+  const ml=$('msglist'); ml.innerHTML=''; ml.dataset.lastDate='';
   (msgCache[gid]||[]).forEach(m=>appendMsg(m,false));
   scrollToBottom(ml);
   loadReactionsForChat(gid);
